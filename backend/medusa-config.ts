@@ -35,5 +35,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/review",
       key: "reviewModule",
     },
+    {
+      resolve: "./src/modules/wishlist",
+      key: "wishlistModule",
+    },
   ],
 })

@@ -1,4 +1,4 @@
-import { defineMiddlewares, validateAndTransformBody } from "@medusajs/framework/http"
+import { authenticate, defineMiddlewares, validateAndTransformBody } from "@medusajs/framework/http"
 import { z } from "zod"
 
 const reviewSchema = z.object({
@@ -10,12 +10,23 @@ const reviewSchema = z.object({
 
 export type CreateReviewBody = z.infer<typeof reviewSchema>
 
+export type ToggleWishlistBody = { product_id: string }
+
 export default defineMiddlewares({
   routes: [
     {
       matcher: "/store/reviews",
       method: "POST",
       middlewares: [validateAndTransformBody(reviewSchema)],
+    },
+    {
+      matcher: "/store/wishlist",
+      middlewares: [authenticate("customer", ["bearer", "session"])],
+    },
+    {
+      matcher: "/store/wishlist",
+      method: "POST",
+      middlewares: [validateAndTransformBody(z.object({ product_id: z.string() }))],
     },
   ],
 })
