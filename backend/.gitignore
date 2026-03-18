@@ -23,4 +23,6 @@ build
 !.yarn/sdks
 !.yarn/versions
 
-.medusa*.env.test
+.medusa/
+.env.test
+.env.*
