@@ -47,8 +47,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem = async (lineItemId: string) => {
     if (!cart) return
-    const { cart: updated } = await sdk.store.cart.deleteLineItem(cart.id, lineItemId)
-    setCart(updated)
+    const response = await sdk.store.cart.deleteLineItem(cart.id, lineItemId)
+    if (response.parent) {
+      setCart(response.parent)
+    }
   }
 
   const itemCount = cart?.items?.reduce((acc, item) => acc + item.quantity, 0) ?? 0

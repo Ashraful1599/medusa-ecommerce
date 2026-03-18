@@ -1,0 +1,76 @@
+import Link from "next/link"
+import { Container } from "./Container"
+
+export function Footer() {
+  return (
+    <footer className="bg-[#111111] text-white mt-16">
+      <Container>
+        <div className="py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div>
+            <div className="font-black text-xl tracking-tight mb-3">SHOPX</div>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              Your one-stop shop for fashion, health, electronics, home goods, and sports.
+            </p>
+          </div>
+
+          {/* Shop */}
+          <div>
+            <h3 className="font-semibold text-sm mb-4 uppercase tracking-wider">Shop</h3>
+            <ul className="space-y-2">
+              {[
+                { href: "/shop/fashion", label: "Fashion" },
+                { href: "/shop/medicine", label: "Medicine" },
+                { href: "/shop/electronics", label: "Electronics" },
+                { href: "/shop/home-living", label: "Home & Living" },
+                { href: "/shop/sports", label: "Sports" },
+              ].map(l => (
+                <li key={l.href}><Link href={l.href} className="text-sm text-gray-400 hover:text-white transition-colors">{l.label}</Link></li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Help */}
+          <div>
+            <h3 className="font-semibold text-sm mb-4 uppercase tracking-wider">Help</h3>
+            <ul className="space-y-2">
+              {[
+                { href: "/faq", label: "FAQ" },
+                { href: "/shipping", label: "Shipping & Returns" },
+                { href: "/contact", label: "Contact Us" },
+                { href: "/track-order", label: "Track Order" },
+              ].map(l => (
+                <li key={l.href}><Link href={l.href} className="text-sm text-gray-400 hover:text-white transition-colors">{l.label}</Link></li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Newsletter */}
+          <div>
+            <h3 className="font-semibold text-sm mb-4 uppercase tracking-wider">Stay Updated</h3>
+            <p className="text-sm text-gray-400 mb-3">Get deals and new arrivals in your inbox.</p>
+            <form className="flex gap-2" onSubmit={e => e.preventDefault()}>
+              <input
+                type="email"
+                placeholder="Your email"
+                className="flex-1 px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F0C040]"
+              />
+              <button type="submit" className="px-3 py-2 bg-[#F0C040] text-[#111111] text-sm font-semibold rounded-sm hover:bg-yellow-400 transition-colors">
+                Go
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="border-t border-gray-800 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+          <span>© {new Date().getFullYear()} SHOPX. All rights reserved.</span>
+          <div className="flex gap-4">
+            <Link href="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-gray-300">Terms of Service</Link>
+          </div>
+        </div>
+      </Container>
+    </footer>
+  )
+}
