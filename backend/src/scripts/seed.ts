@@ -1322,6 +1322,7 @@ export default async function seedData({ container }: ExecArgs) {
           type: "fixed",
           target_type: "order",
           value: 10,
+          currency_code: "usd",
         },
       },
       {
