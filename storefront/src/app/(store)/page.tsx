@@ -1,10 +1,36 @@
-import { Container } from "@/components/layout/Container"
+import type { Metadata } from "next"
+import { HeroBanner } from "@/components/home/HeroBanner"
+import { CategoryStrip } from "@/components/home/CategoryStrip"
+import { PromoBanner } from "@/components/home/PromoBanner"
+import { FeaturedProducts } from "@/components/home/FeaturedProducts"
+import { sdk } from "@/lib/medusa"
 
-export default function HomePage() {
+export const metadata: Metadata = {
+  title: "SHOPX - Shop Everything",
+  description: "Fashion, medicine, electronics, home goods and more. Free shipping on orders over $50.",
+}
+
+async function getFeaturedProducts() {
+  try {
+    const { products } = await sdk.store.product.list({
+      limit: 8,
+      fields: "id,title,handle,thumbnail,collection.title,variants.id,variants.calculated_price",
+    } as any)
+    return products
+  } catch {
+    return []
+  }
+}
+
+export default async function HomePage() {
+  const products = await getFeaturedProducts()
+
   return (
-    <Container className="py-16">
-      <h1 className="text-2xl font-bold">Welcome to SHOPX</h1>
-      <p className="text-gray-500 mt-2">Homepage coming soon...</p>
-    </Container>
+    <>
+      <PromoBanner />
+      <HeroBanner />
+      <CategoryStrip />
+      <FeaturedProducts products={products} currencyCode="usd" />
+    </>
   )
 }
