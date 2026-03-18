@@ -31,5 +31,9 @@ module.exports = defineConfig({
         productIndexName: process.env.MEILISEARCH_PRODUCT_INDEX_NAME || "products",
       },
     },
+    {
+      resolve: "./src/modules/review",
+      key: "reviewModule",
+    },
   ],
 })
