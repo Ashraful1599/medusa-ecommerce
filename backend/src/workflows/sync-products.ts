@@ -24,9 +24,7 @@ export const syncProductsWorkflow = createWorkflow(
         "description",
         "handle",
         "thumbnail",
-        "categories.id",
-        "categories.name",
-        "categories.handle",
+        "collection.title",
         "tags.id",
         "tags.value",
         "status",
@@ -46,8 +44,12 @@ export const syncProductsWorkflow = createWorkflow(
 
         data.products.forEach((product: any) => {
           if (product.status === "published") {
-            const { status, ...rest } = product
-            publishedProducts.push(rest as SyncProductsStepInput["products"][0])
+            const { status, collection, tags, ...rest } = product
+            publishedProducts.push({
+              ...rest,
+              collection_title: collection?.title ?? null,
+              tags: tags?.map((t: any) => t.value) ?? [],
+            } as SyncProductsStepInput["products"][0])
           } else {
             unpublishedProductsToDelete.push(product.id)
           }

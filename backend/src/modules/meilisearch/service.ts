@@ -36,12 +36,23 @@ export default class MeilisearchModuleService {
     }
   }
 
+  async ensureIndexSettings(type: MeilisearchIndexType = "product") {
+    const indexName = await this.getIndexName(type)
+    const index = this.client.index(indexName)
+    await index.updateSettings({
+      searchableAttributes: ["title", "description", "handle", "collection_title", "tags"],
+      displayedAttributes: ["id", "title", "handle", "description", "thumbnail", "collection_title", "tags"],
+    })
+  }
+
   async indexData(
     data: Record<string, unknown>[],
     type: MeilisearchIndexType = "product"
   ) {
     const indexName = await this.getIndexName(type)
     const index = this.client.index(indexName)
+
+    await this.ensureIndexSettings(type)
 
     const documents = data.map((item) => ({
       ...item,
