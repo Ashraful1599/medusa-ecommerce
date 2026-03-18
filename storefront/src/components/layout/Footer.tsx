@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Container } from "./Container"
+import { NewsletterForm } from "./NewsletterForm"
 
 export function Footer() {
   return (
@@ -49,16 +50,7 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-sm mb-4 uppercase tracking-wider">Stay Updated</h3>
             <p className="text-sm text-gray-400 mb-3">Get deals and new arrivals in your inbox.</p>
-            <form className="flex gap-2" onSubmit={e => e.preventDefault()}>
-              <input
-                type="email"
-                placeholder="Your email"
-                className="flex-1 px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F0C040]"
-              />
-              <button type="submit" className="px-3 py-2 bg-[#F0C040] text-[#111111] text-sm font-semibold rounded-sm hover:bg-yellow-400 transition-colors">
-                Go
-              </button>
-            </form>
+            <NewsletterForm />
           </div>
         </div>
 

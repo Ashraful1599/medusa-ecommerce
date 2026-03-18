@@ -8,7 +8,8 @@ async function getCategories() {
   try {
     const { product_categories } = await sdk.store.category.list({ limit: 10 })
     return product_categories
-  } catch {
+  } catch (err) {
+    console.error("[Navbar] Failed to fetch categories:", err)
     return []
   }
 }
