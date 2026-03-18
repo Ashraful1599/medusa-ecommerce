@@ -1,6 +1,6 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { WISHLIST_MODULE } from "../../../modules/wishlist"
-import WishlistModuleService from "../../../modules/wishlist/service"
+import type WishlistModuleService from "../../../modules/wishlist/service"
 import { toggleWishlistWorkflow } from "../../../workflows/toggle-wishlist"
 import type { ToggleWishlistBody } from "../../middlewares"
 

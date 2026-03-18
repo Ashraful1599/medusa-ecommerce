@@ -10,7 +10,8 @@ const reviewSchema = z.object({
 
 export type CreateReviewBody = z.infer<typeof reviewSchema>
 
-export type ToggleWishlistBody = { product_id: string }
+const wishlistSchema = z.object({ product_id: z.string() })
+export type ToggleWishlistBody = z.infer<typeof wishlistSchema>
 
 export default defineMiddlewares({
   routes: [
@@ -26,7 +27,7 @@ export default defineMiddlewares({
     {
       matcher: "/store/wishlist",
       method: "POST",
-      middlewares: [validateAndTransformBody(z.object({ product_id: z.string() }))],
+      middlewares: [validateAndTransformBody(wishlistSchema)],
     },
   ],
 })
