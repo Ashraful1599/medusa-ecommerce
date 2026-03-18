@@ -1,4 +1,3 @@
-"use client"
 import { ProductCard } from "@/components/ui/ProductCard"
 import { Container } from "@/components/layout/Container"
 import { Button } from "@/components/ui/Button"
