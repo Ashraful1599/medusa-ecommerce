@@ -8,6 +8,8 @@ const reviewSchema = z.object({
   content: z.string().optional(),
 })
 
+export type CreateReviewBody = z.infer<typeof reviewSchema>
+
 export default defineMiddlewares({
   routes: [
     {

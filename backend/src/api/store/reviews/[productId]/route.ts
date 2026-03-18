@@ -4,9 +4,12 @@ import ReviewModuleService from "../../../../modules/review/service"
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const reviewService: ReviewModuleService = req.scope.resolve(REVIEW_MODULE)
-  const reviews = await reviewService.listReviews(
+  const limit = Math.min(Number(req.query.limit) || 20, 100)
+  const offset = Number(req.query.offset) || 0
+
+  const [reviews, count] = await reviewService.listAndCountReviews(
     { product_id: req.params.productId },
-    { order: { created_at: "DESC" }, skip: 0, take: 20 }
+    { order: { created_at: "DESC" }, skip: offset, take: limit }
   )
-  res.json({ reviews })
+  res.json({ reviews, count, limit, offset })
 }
