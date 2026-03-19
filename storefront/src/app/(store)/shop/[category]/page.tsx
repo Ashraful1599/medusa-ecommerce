@@ -37,29 +37,72 @@ async function getCategories() {
   }
 }
 
+function getProductPrice(product: { variants?: { calculated_price?: { calculated_amount?: number | null } | null }[] }): number {
+  const amounts = product.variants
+    ?.flatMap(v => v.calculated_price ? [v.calculated_price.calculated_amount ?? 0] : []) ?? []
+  return amounts.length ? Math.min(...amounts) : 0
+}
+
 async function getProducts(categoryId: string, searchParams: SearchParams) {
-  const page = Math.max(1, Number(getParam(searchParams, "page")) || 1)
-  const offset = (page - 1) * LIMIT
+  const page     = Math.max(1, Number(getParam(searchParams, "page")) || 1)
+  const sort     = getParam(searchParams, "sort")
+  const priceMax = getParam(searchParams, "price_max")
+
+  const needsClientSort   = sort === "price_asc" || sort === "price_desc"
+  const needsClientFilter = !!priceMax
 
   try {
     const query: Record<string, unknown> = {
-      limit: LIMIT,
-      offset,
+      limit: needsClientSort || needsClientFilter ? 200 : LIMIT,
+      offset: needsClientSort || needsClientFilter ? 0 : (page - 1) * LIMIT,
       category_id: [categoryId],
+      region_id: process.env.NEXT_PUBLIC_DEFAULT_REGION_ID,
       fields: "id,title,handle,thumbnail,collection.title,variants.id,variants.calculated_price",
     }
 
-    const sort = getParam(searchParams, "sort")
-    if (sort === "price_asc") query.order = "variants.calculated_price.calculated_amount"
-    if (sort === "price_desc") query.order = "-variants.calculated_price.calculated_amount"
     if (sort === "created_at_desc") query.order = "-created_at"
-    if (sort === "title_asc") query.order = "title"
+    if (sort === "title_asc")       query.order = "title"
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { products, count } = await (sdk.store.product.list as any)(query)
-    return { products, count: count ?? 0, page }
+    let { products, count: apiCount } = await (sdk.store.product.list as any)(query)
+
+    // Client-side price filter
+    if (priceMax) {
+      const max = Number(priceMax)
+      products = products.filter((p: Parameters<typeof getProductPrice>[0]) => {
+        const price = getProductPrice(p)
+        return price > 0 && price <= max
+      })
+    }
+
+    // Client-side price sort
+    if (sort === "price_asc") {
+      products = [...products].sort((a: Parameters<typeof getProductPrice>[0], b: Parameters<typeof getProductPrice>[0]) => getProductPrice(a) - getProductPrice(b))
+    } else if (sort === "price_desc") {
+      products = [...products].sort((a: Parameters<typeof getProductPrice>[0], b: Parameters<typeof getProductPrice>[0]) => getProductPrice(b) - getProductPrice(a))
+    }
+
+    // Use filtered length as count when doing client-side work, otherwise use API count
+    const count = (needsClientSort || needsClientFilter) ? products.length : (apiCount ?? 0)
+
+    // Manual pagination when we fetched everything
+    if (needsClientSort || needsClientFilter) {
+      const offset = (page - 1) * LIMIT
+      products = products.slice(offset, offset + LIMIT)
+    }
+
+    return { products, count, page }
   } catch {
     return { products: [], count: 0, page: 1 }
+  }
+}
+
+export async function generateStaticParams() {
+  try {
+    const { product_categories } = await sdk.store.category.list({ limit: 100 })
+    return product_categories.map((cat) => ({ category: cat.handle }))
+  } catch {
+    return []
   }
 }
 
@@ -67,8 +110,10 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { category } = await params
   const cat = await getCategory(category)
   return {
-    title: cat ? `${cat.name} - SHOPX` : "Shop - SHOPX",
-    description: cat ? `Browse ${cat.name} products at SHOPX` : "Shop at SHOPX",
+    title: cat ? cat.name : "Shop",
+    description: cat
+      ? `Browse ${cat.name} products at Nexly — fashion, electronics, home goods, and more.`
+      : "Shop all products at Nexly.",
   }
 }
 
@@ -80,15 +125,10 @@ export default async function CategoryPage({
   searchParams: Promise<SearchParams>
 }) {
   const [{ category: handle }, spParams] = await Promise.all([params, searchParams])
-  const [cat, categories, { products, count, page }] = await Promise.all([
-    getCategory(handle),
-    getCategories(),
-    (async () => {
-      const c = await getCategory(handle)
-      if (!c) return { products: [], count: 0, page: 1 }
-      return getProducts(c.id, spParams)
-    })(),
-  ])
+  const [cat, categories] = await Promise.all([getCategory(handle), getCategories()])
+  const { products, count, page } = cat
+    ? await getProducts(cat.id, spParams)
+    : { products: [], count: 0, page: 1 }
 
   if (!cat) notFound()
 

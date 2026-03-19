@@ -12,6 +12,7 @@ interface ProductCardProps {
   product: HttpTypes.StoreProduct
   currencyCode?: string
   className?: string
+  badge?: string
 }
 
 function getLowestPrice(product: HttpTypes.StoreProduct): number | null {
@@ -21,7 +22,7 @@ function getLowestPrice(product: HttpTypes.StoreProduct): number | null {
   return Math.min(...prices)
 }
 
-export function ProductCard({ product, currencyCode = "usd", className }: ProductCardProps) {
+export function ProductCard({ product, currencyCode = "usd", className, badge }: ProductCardProps) {
   const { addItem } = useCart()
   const { toggle, isWishlisted } = useWishlist()
 
@@ -39,6 +40,13 @@ export function ProductCard({ product, currencyCode = "usd", className }: Produc
 
   return (
     <div className={cn("group relative border border-[#E5E5E5] rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow", className)}>
+      {/* Badge */}
+      {badge && (
+        <div className="absolute top-3 left-3 z-10 bg-[#F0C040] text-[#111111] text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
+          {badge}
+        </div>
+      )}
+
       {/* Wishlist */}
       <button
         onClick={(e) => { e.preventDefault(); toggle(product.id ?? "") }}

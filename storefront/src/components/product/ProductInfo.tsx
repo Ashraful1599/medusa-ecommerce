@@ -24,20 +24,42 @@ export function ProductInfo({ product, currencyCode = "usd" }: ProductInfoProps)
 
   const wishlisted = isWishlisted(product.id ?? "")
 
-  // Get images — primary + variant images, deduplicated
-  const images = [
+  // All product images (thumbnail first), deduplicated
+  const allProductImages = [
     ...(product.thumbnail ? [product.thumbnail] : []),
     ...(product.images?.map(img => img.url).filter(Boolean) ?? []),
   ].filter((url, i, arr) => arr.indexOf(url) === i) as string[]
 
   const selectedVariant = product.variants?.find(v => v.id === selectedVariantId)
+
+  // If the selected variant has its own images, show those; otherwise show all product images.
+  const variantImages = (selectedVariant as any)?.images as Array<{ id: string; url: string }> | undefined
+  const images = variantImages && variantImages.length > 0
+    ? variantImages.map(img => img.url).filter(Boolean) as string[]
+    : allProductImages
+
+  // Find the index of the first image that's unique to this variant (not shared by all variants).
+  // This lets the gallery jump straight to the color/style-specific photo instead of always index 0.
+  const jumpToIndex = (() => {
+    if (!variantImages || variantImages.length === 0) return 0
+    // Build a set of URLs that appear in every variant's image list (shared images)
+    const allVariantImageSets = (product.variants ?? []).map(v =>
+      new Set(((v as any).images ?? []).map((i: any) => i.url as string))
+    )
+    const sharedUrls = new Set(
+      images.filter(url => allVariantImageSets.every(set => set.has(url)))
+    )
+    const uniqueIdx = images.findIndex(url => !sharedUrls.has(url))
+    return uniqueIdx >= 0 ? uniqueIdx : 0
+  })()
+
   // calculated_price is a computed field — use type assertion as Medusa types may be incomplete
   const price = (selectedVariant as any)?.calculated_price?.calculated_amount ?? null
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
       {/* Gallery */}
-      <ImageGallery images={images.length > 0 ? images : []} title={product.title ?? ""} />
+      <ImageGallery images={images.length > 0 ? images : []} title={product.title ?? ""} jumpToIndex={jumpToIndex} />
 
       {/* Product info */}
       <div>

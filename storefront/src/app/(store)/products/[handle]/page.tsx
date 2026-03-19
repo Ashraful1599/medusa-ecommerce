@@ -13,7 +13,8 @@ async function getProduct(handle: string) {
     // sdk.store.product.list types may be incomplete — using any for field-level query support
     const { products } = await (sdk.store.product.list as any)({
       handle,
-      fields: "id,title,handle,description,thumbnail,images,collection.title,options.title,options.values.value,variants.id,variants.title,variants.options.option_id,variants.options.value,variants.calculated_price",
+      region_id: process.env.NEXT_PUBLIC_DEFAULT_REGION_ID,
+      fields: "id,title,handle,description,thumbnail,images.id,images.url,collection.title,options.id,options.title,options.values.value,variants.id,variants.title,variants.options.option_id,variants.options.value,variants.calculated_price,variants.images.id,variants.images.url",
     })
     return products?.[0] ?? null
   } catch {
@@ -24,10 +25,10 @@ async function getProduct(handle: string) {
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { handle } = await params
   const product = await getProduct(handle)
-  if (!product) return { title: "Product Not Found - SHOPX" }
+  if (!product) return { title: "Product Not Found" }
   return {
-    title: `${product.title} - SHOPX`,
-    description: product.description ?? `Buy ${product.title} at SHOPX`,
+    title: product.title,
+    description: product.description ?? `Buy ${product.title} at Nexly`,
     openGraph: {
       title: product.title,
       description: product.description ?? "",

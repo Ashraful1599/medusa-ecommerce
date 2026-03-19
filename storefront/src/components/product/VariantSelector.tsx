@@ -1,4 +1,5 @@
 "use client"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { HttpTypes } from "@medusajs/types"
 
@@ -8,17 +9,14 @@ interface VariantSelectorProps {
   onVariantChange: (variantId: string) => void
 }
 
-// Build option maps for display
 function buildOptionMap(product: HttpTypes.StoreProduct) {
-  const options = product.options ?? []
-  return options.map(option => ({
-    id: option.id,
+  return (product.options ?? []).map(option => ({
+    id: option.id!,
     title: option.title,
-    values: option.values?.map(v => v.value) ?? [],
+    values: [...new Set(option.values?.map(v => v.value).filter(Boolean) as string[])],
   }))
 }
 
-// Find which variant matches the selected options
 function findVariant(product: HttpTypes.StoreProduct, selectedOptions: Record<string, string>) {
   return product.variants?.find(v =>
     v.options?.every(o => selectedOptions[o.option_id ?? ""] === o.value)
@@ -28,15 +26,19 @@ function findVariant(product: HttpTypes.StoreProduct, selectedOptions: Record<st
 export function VariantSelector({ product, selectedVariantId, onVariantChange }: VariantSelectorProps) {
   const optionMap = buildOptionMap(product)
 
-  // Derive selected options from selectedVariantId
-  const selectedVariant = product.variants?.find(v => v.id === selectedVariantId)
-  const selectedOptions: Record<string, string> = {}
-  selectedVariant?.options?.forEach(o => {
-    if (o.option_id) selectedOptions[o.option_id] = o.value ?? ""
+  // Local state so buttons respond immediately regardless of variant match
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {}
+    const preselected = product.variants?.find(v => v.id === selectedVariantId)
+    preselected?.options?.forEach(o => {
+      if (o.option_id) initial[o.option_id] = o.value ?? ""
+    })
+    return initial
   })
 
   const handleOptionClick = (optionId: string, value: string) => {
     const newOptions = { ...selectedOptions, [optionId]: value }
+    setSelectedOptions(newOptions)
     const variant = findVariant(product, newOptions)
     if (variant?.id) onVariantChange(variant.id)
   }

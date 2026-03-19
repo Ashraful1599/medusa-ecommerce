@@ -36,3 +36,18 @@ body {
   color: var(--foreground);
   font-family: "Inter", Arial, Helvetica, sans-serif;
 }
+
+button,
+a,
+select,
+label[for],
+[type="submit"],
+[type="button"],
+[type="reset"],
+[role="button"],
+[role="link"],
+[role="option"],
+[role="menuitem"],
+[role="tab"] {
+  cursor: pointer;
+}

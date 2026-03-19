@@ -108,84 +108,108 @@ export default async function seedData({ container }: ExecArgs) {
     // 3. Regions
     // -----------------------------------------------------------------------
     logger.info("Seeding regions (US, UK, Bangladesh)...")
-    const { result: regionResult } = await createRegionsWorkflow(
-      container
-    ).run({
-      input: {
-        regions: [
-          {
-            name: "United States",
-            currency_code: "usd",
-            countries: ["us"],
-            payment_providers: ["pp_system_default"],
-          },
-          {
-            name: "United Kingdom",
-            currency_code: "gbp",
-            countries: ["gb"],
-            payment_providers: ["pp_system_default"],
-          },
-          {
-            name: "Bangladesh",
-            currency_code: "bdt",
-            countries: ["bd"],
-            payment_providers: ["pp_system_default"],
-          },
-        ],
-      },
-    })
+    const { regionModule } = container.resolve ? {} as any : {} as any
+    const regionService = container.resolve(Modules.REGION)
+    const existingRegions = await regionService.listRegions({})
 
-    const regionUS = regionResult.find((r) => r.name === "United States")!
-    const regionUK = regionResult.find((r) => r.name === "United Kingdom")!
-    const regionBD = regionResult.find((r) => r.name === "Bangladesh")!
-
-    // -----------------------------------------------------------------------
-    // Tax regions
-    // -----------------------------------------------------------------------
-    logger.info("Seeding tax regions...")
-    await createTaxRegionsWorkflow(container).run({
-      input: [
-        { country_code: "us", provider_id: "tp_system" },
-        { country_code: "gb", provider_id: "tp_system" },
-        { country_code: "bd", provider_id: "tp_system" },
-      ],
-    })
-
-    // -----------------------------------------------------------------------
-    // 4. Stock location + fulfillment
-    // -----------------------------------------------------------------------
-    logger.info("Seeding stock location & fulfillment...")
-    const { result: stockLocationResult } = await createStockLocationsWorkflow(
-      container
-    ).run({
-      input: {
-        locations: [
-          {
-            name: "Main Warehouse",
-            address: {
-              city: "New York",
-              country_code: "US",
-              address_1: "1 Commerce Blvd",
+    let regionResult: any[]
+    if (existingRegions.length > 0) {
+      logger.info("Regions already exist, skipping creation.")
+      regionResult = existingRegions
+    } else {
+      const { result } = await createRegionsWorkflow(container).run({
+        input: {
+          regions: [
+            {
+              name: "United States",
+              currency_code: "usd",
+              countries: ["us"],
+              payment_providers: ["pp_system_default"],
             },
-          },
+            {
+              name: "United Kingdom",
+              currency_code: "gbp",
+              countries: ["gb"],
+              payment_providers: ["pp_system_default"],
+            },
+            {
+              name: "Bangladesh",
+              currency_code: "bdt",
+              countries: ["bd"],
+              payment_providers: ["pp_system_default"],
+            },
+          ],
+        },
+      })
+      regionResult = result
+    }
+
+    const regionUS = regionResult.find((r: any) => r.name === "United States")!
+    const regionUK = regionResult.find((r: any) => r.name === "United Kingdom")!
+    const regionBD = regionResult.find((r: any) => r.name === "Bangladesh")!
+
+    // -----------------------------------------------------------------------
+    // Tax regions (idempotent)
+    // -----------------------------------------------------------------------
+    const taxModule = container.resolve(Modules.TAX)
+    const existingTaxRegions = await taxModule.listTaxRegions({})
+    if (existingTaxRegions.length === 0) {
+      logger.info("Seeding tax regions...")
+      await createTaxRegionsWorkflow(container).run({
+        input: [
+          { country_code: "us", provider_id: "tp_system" },
+          { country_code: "gb", provider_id: "tp_system" },
+          { country_code: "bd", provider_id: "tp_system" },
         ],
-      },
-    })
-    const stockLocation = stockLocationResult[0]
+      })
+    } else {
+      logger.info("Tax regions already exist, skipping.")
+    }
 
-    await updateStoresWorkflow(container).run({
-      input: {
-        selector: { id: store.id },
-        update: { default_location_id: stockLocation.id },
-      },
-    })
+    // -----------------------------------------------------------------------
+    // 4. Stock location + fulfillment (idempotent)
+    // -----------------------------------------------------------------------
+    const stockLocationModule = container.resolve(Modules.STOCK_LOCATION)
+    const existingLocations = await stockLocationModule.listStockLocations({})
+    let stockLocation: any
 
-    await link.create({
-      [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
-      [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
-    })
+    if (existingLocations.length === 0) {
+      logger.info("Seeding stock location & fulfillment...")
+      const { result: stockLocationResult } = await createStockLocationsWorkflow(
+        container
+      ).run({
+        input: {
+          locations: [
+            {
+              name: "Main Warehouse",
+              address: {
+                city: "New York",
+                country_code: "US",
+                address_1: "1 Commerce Blvd",
+              },
+            },
+          ],
+        },
+      })
+      stockLocation = stockLocationResult[0]
 
-    // Shipping profile
+      await updateStoresWorkflow(container).run({
+        input: {
+          selector: { id: store.id },
+          update: { default_location_id: stockLocation.id },
+        },
+      })
+
+      await link.create({
+        [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+        [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
+      })
+    } else {
+      logger.info("Stock location already exists, skipping.")
+      stockLocation = existingLocations[0]
+    }
+
+    // Shipping profile (already idempotent)
     const existingProfiles =
       await fulfillmentModuleService.listShippingProfiles({ type: "default" })
     let shippingProfile = existingProfiles.length ? existingProfiles[0] : null
@@ -201,9 +225,12 @@ export default async function seedData({ container }: ExecArgs) {
       shippingProfile = spResult[0]
     }
 
-    // Fulfillment set with service zones for all 3 countries
-    const fulfillmentSet =
-      await fulfillmentModuleService.createFulfillmentSets({
+    // Fulfillment set (idempotent)
+    const existingFulfillmentSets = await fulfillmentModuleService.listFulfillmentSets({ name: "Global Delivery" })
+    let serviceZoneId: string
+
+    if (existingFulfillmentSets.length === 0) {
+      const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
         name: "Global Delivery",
         type: "shipping",
         service_zones: [
@@ -217,101 +244,123 @@ export default async function seedData({ container }: ExecArgs) {
           },
         ],
       })
-
-    await link.create({
-      [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
-      [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
-    })
-
-    const serviceZoneId = fulfillmentSet.service_zones[0].id
+      await link.create({
+        [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+        [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
+      })
+      serviceZoneId = fulfillmentSet.service_zones[0].id
+    } else {
+      logger.info("Fulfillment set already exists, skipping.")
+      const existingWithZones = await fulfillmentModuleService.listFulfillmentSets(
+        { name: "Global Delivery" },
+        { relations: ["service_zones"] }
+      )
+      serviceZoneId = existingWithZones[0].service_zones[0].id
+    }
 
     // -----------------------------------------------------------------------
-    // 5. Shipping options (Standard + Express per region)
+    // 5. Shipping options (idempotent)
     // -----------------------------------------------------------------------
-    logger.info("Seeding shipping options...")
-    await createShippingOptionsWorkflow(container).run({
-      input: [
-        {
-          name: "Standard Shipping",
-          price_type: "flat",
-          provider_id: "manual_manual",
-          service_zone_id: serviceZoneId,
-          shipping_profile_id: shippingProfile!.id,
-          type: {
-            label: "Standard",
-            description: "Delivered in 5-7 business days.",
-            code: "standard",
+    const existingShippingOptions = await fulfillmentModuleService.listShippingOptions({})
+    if (existingShippingOptions.length === 0) {
+      logger.info("Seeding shipping options...")
+      await createShippingOptionsWorkflow(container).run({
+        input: [
+          {
+            name: "Standard Shipping",
+            price_type: "flat",
+            provider_id: "manual_manual",
+            service_zone_id: serviceZoneId,
+            shipping_profile_id: shippingProfile!.id,
+            type: {
+              label: "Standard",
+              description: "Delivered in 5-7 business days.",
+              code: "standard",
+            },
+            prices: [
+              { currency_code: "usd", amount: 0 },
+              { currency_code: "gbp", amount: 0 },
+              { currency_code: "bdt", amount: 0 },
+              { region_id: regionUS.id, amount: 0 },
+              { region_id: regionUK.id, amount: 0 },
+              { region_id: regionBD.id, amount: 0 },
+            ],
+            rules: [
+              { attribute: "enabled_in_store", value: "true", operator: "eq" },
+              { attribute: "is_return", value: "false", operator: "eq" },
+            ],
           },
-          prices: [
-            { currency_code: "usd", amount: 0 },
-            { currency_code: "gbp", amount: 0 },
-            { currency_code: "bdt", amount: 0 },
-            { region_id: regionUS.id, amount: 0 },
-            { region_id: regionUK.id, amount: 0 },
-            { region_id: regionBD.id, amount: 0 },
-          ],
-          rules: [
-            { attribute: "enabled_in_store", value: "true", operator: "eq" },
-            { attribute: "is_return", value: "false", operator: "eq" },
-          ],
-        },
-        {
-          name: "Express Shipping",
-          price_type: "flat",
-          provider_id: "manual_manual",
-          service_zone_id: serviceZoneId,
-          shipping_profile_id: shippingProfile!.id,
-          type: {
-            label: "Express",
-            description: "Delivered in 1-2 business days.",
-            code: "express",
+          {
+            name: "Express Shipping",
+            price_type: "flat",
+            provider_id: "manual_manual",
+            service_zone_id: serviceZoneId,
+            shipping_profile_id: shippingProfile!.id,
+            type: {
+              label: "Express",
+              description: "Delivered in 1-2 business days.",
+              code: "express",
+            },
+            prices: [
+              { currency_code: "usd", amount: 9.99 },
+              { currency_code: "gbp", amount: 7.89 },
+              { currency_code: "bdt", amount: 1099 },
+              { region_id: regionUS.id, amount: 9.99 },
+              { region_id: regionUK.id, amount: 7.89 },
+              { region_id: regionBD.id, amount: 1099 },
+            ],
+            rules: [
+              { attribute: "enabled_in_store", value: "true", operator: "eq" },
+              { attribute: "is_return", value: "false", operator: "eq" },
+            ],
           },
-          prices: [
-            { currency_code: "usd", amount: 9.99 },
-            { currency_code: "gbp", amount: 7.89 },
-            { currency_code: "bdt", amount: 1099 },
-            { region_id: regionUS.id, amount: 9.99 },
-            { region_id: regionUK.id, amount: 7.89 },
-            { region_id: regionBD.id, amount: 1099 },
-          ],
-          rules: [
-            { attribute: "enabled_in_store", value: "true", operator: "eq" },
-            { attribute: "is_return", value: "false", operator: "eq" },
-          ],
-        },
-      ],
-    })
-
-    await linkSalesChannelsToStockLocationWorkflow(container).run({
-      input: { id: stockLocation.id, add: [salesChannelId] },
-    })
-
-    // -----------------------------------------------------------------------
-    // 6. Product categories
-    // -----------------------------------------------------------------------
-    logger.info("Seeding product categories...")
-    const { result: categoryResult } = await createProductCategoriesWorkflow(
-      container
-    ).run({
-      input: {
-        product_categories: [
-          { name: "Fashion", handle: "fashion", is_active: true },
-          { name: "Medicine", handle: "medicine", is_active: true },
-          { name: "Electronics", handle: "electronics", is_active: true },
-          { name: "Home & Living", handle: "home-living", is_active: true },
-          { name: "Sports", handle: "sports", is_active: true },
         ],
-      },
-    })
+      })
 
-    const catId = (name: string) =>
-      categoryResult.find((c) => c.name === name)!.id
+      await linkSalesChannelsToStockLocationWorkflow(container).run({
+        input: { id: stockLocation.id, add: [salesChannelId] },
+      })
+    } else {
+      logger.info("Shipping options already exist, skipping.")
+    }
 
-    const fashionId = catId("Fashion")
-    const medicineId = catId("Medicine")
-    const electronicsId = catId("Electronics")
-    const homeId = catId("Home & Living")
-    const sportsId = catId("Sports")
+    // -----------------------------------------------------------------------
+    // 6. Product categories (idempotent)
+    // -----------------------------------------------------------------------
+    const productCategoryModule = container.resolve(Modules.PRODUCT)
+    const existingCategories = await productCategoryModule.listProductCategories(
+      {},
+      { select: ["id", "name", "handle"] }
+    )
+
+    let categoryResult: any[]
+    if (existingCategories.length > 0) {
+      logger.info("Product categories already exist, skipping.")
+      categoryResult = existingCategories
+    } else {
+      logger.info("Seeding product categories...")
+      const { result } = await createProductCategoriesWorkflow(container).run({
+        input: {
+          product_categories: [
+            { name: "Fashion", handle: "fashion", is_active: true },
+            { name: "Medicine", handle: "medicine", is_active: true },
+            { name: "Electronics", handle: "electronics", is_active: true },
+            { name: "Home & Living", handle: "home-living", is_active: true },
+            { name: "Sports", handle: "sports", is_active: true },
+          ],
+        },
+      })
+      categoryResult = result
+    }
+
+    const catId = (handle: string) =>
+      categoryResult.find((c: any) => c.handle === handle)!.id
+
+    const fashionId = catId("fashion")
+    const medicineId = catId("medicine")
+    const electronicsId = catId("electronics")
+    const homeId = catId("home-living")
+    const sportsId = catId("sports")
 
     // -----------------------------------------------------------------------
     // Helpers for prices & variants
@@ -325,11 +374,17 @@ export default async function seedData({ container }: ExecArgs) {
     const sc = [{ id: salesChannelId }]
 
     // -----------------------------------------------------------------------
-    // 7. Products
+    // 7. Products (idempotent per category)
     // -----------------------------------------------------------------------
     logger.info("Seeding products...")
+    const productModule = container.resolve(Modules.PRODUCT)
+    const existingProducts = await productModule.listProducts({})
+    const existingHandles = new Set(existingProducts.map((p: any) => p.handle))
 
     // ---- FASHION ----
+    if (existingHandles.has("mens-classic-tshirt")) {
+      logger.info("Fashion products already exist, skipping.")
+    } else
     await createProductsWorkflow(container).run({
       input: {
         products: [
@@ -628,11 +683,22 @@ export default async function seedData({ container }: ExecArgs) {
             ],
             thumbnail:
               "https://images.unsplash.com/photo-1627123424574-724758594e93?w=400",
+            options: [
+              { title: "Color", values: ["Brown", "Black"] },
+            ],
             variants: [
               {
-                title: "Default",
-                sku: "WALLET-DEFAULT",
+                title: "Brown",
+                sku: "WALLET-BROWN",
                 manage_inventory: false,
+                options: { Color: "Brown" },
+                prices: prices(34.99),
+              },
+              {
+                title: "Black",
+                sku: "WALLET-BLACK",
+                manage_inventory: false,
+                options: { Color: "Black" },
                 prices: prices(34.99),
               },
             ],
@@ -644,6 +710,9 @@ export default async function seedData({ container }: ExecArgs) {
     logger.info("Fashion products seeded.")
 
     // ---- MEDICINE ----
+    if (existingHandles.has("vitamin-c-1000mg")) {
+      logger.info("Medicine products already exist, skipping.")
+    } else
     await createProductsWorkflow(container).run({
       input: {
         products: [
@@ -780,11 +849,15 @@ export default async function seedData({ container }: ExecArgs) {
             ],
             thumbnail:
               "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=400",
+            options: [
+              { title: "Size", values: ["500ml"] },
+            ],
             variants: [
               {
                 title: "500ml",
                 sku: "SANITIZER-500",
                 manage_inventory: false,
+                options: { Size: "500ml" },
                 prices: prices(8.99),
               },
             ],
@@ -806,11 +879,15 @@ export default async function seedData({ container }: ExecArgs) {
             ],
             thumbnail:
               "https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=400",
+            options: [
+              { title: "Size", values: ["100g"] },
+            ],
             variants: [
               {
                 title: "100g tube",
                 sku: "PAINCREAM-100",
                 manage_inventory: false,
+                options: { Size: "100g" },
                 prices: prices(11.99),
               },
             ],
@@ -822,6 +899,9 @@ export default async function seedData({ container }: ExecArgs) {
     logger.info("Medicine products seeded.")
 
     // ---- ELECTRONICS ----
+    if (existingHandles.has("wireless-bluetooth-earbuds")) {
+      logger.info("Electronics products already exist, skipping.")
+    } else
     await createProductsWorkflow(container).run({
       input: {
         products: [
@@ -1012,6 +1092,9 @@ export default async function seedData({ container }: ExecArgs) {
     logger.info("Electronics products seeded.")
 
     // ---- HOME & LIVING ----
+    if (existingHandles.has("scented-candle-set")) {
+      logger.info("Home & Living products already exist, skipping.")
+    } else
     await createProductsWorkflow(container).run({
       input: {
         products: [
@@ -1187,6 +1270,9 @@ export default async function seedData({ container }: ExecArgs) {
     logger.info("Home & Living products seeded.")
 
     // ---- SPORTS ----
+    if (existingHandles.has("yoga-mat")) {
+      logger.info("Sports products already exist, skipping.")
+    } else
     await createProductsWorkflow(container).run({
       input: {
         products: [
@@ -1249,11 +1335,15 @@ export default async function seedData({ container }: ExecArgs) {
             ],
             thumbnail:
               "https://images.unsplash.com/photo-1598289431512-b97b0917affc?w=400",
+            options: [
+              { title: "Pack", values: ["3-Pack"] },
+            ],
             variants: [
               {
                 title: "3-Pack",
                 sku: "RESISTBANDS-3PACK",
                 manage_inventory: false,
+                options: { Pack: "3-Pack" },
                 prices: prices(22.99),
               },
             ],
@@ -1300,8 +1390,12 @@ export default async function seedData({ container }: ExecArgs) {
     logger.info("Sports products seeded.")
 
     // -----------------------------------------------------------------------
-    // 8. Promotions
+    // 8. Promotions (idempotent)
     // -----------------------------------------------------------------------
+    const existingPromotions = await promotionModuleService.listPromotions({})
+    if (existingPromotions.length > 0) {
+      logger.info("Promotions already exist, skipping.")
+    } else {
     logger.info("Seeding promotions...")
     const promotionsData: PromotionTypes.CreatePromotionDTO[] = [
       {
@@ -1332,12 +1426,15 @@ export default async function seedData({ container }: ExecArgs) {
         application_method: {
           type: "percentage",
           target_type: "shipping_methods",
+          allocation: "each",
+          max_quantity: 1,
           value: 100,
         },
       },
     ]
     await promotionModuleService.createPromotions(promotionsData)
     logger.info("Promotions seeded.")
+    }
 
     logger.info("=== Seed complete! ===")
     logger.info(

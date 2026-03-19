@@ -2,6 +2,8 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Truck, RotateCcw } from "lucide-react"
+import { ReviewList } from "./ReviewList"
+import { ReviewForm } from "./ReviewForm"
 
 type Tab = "description" | "reviews" | "shipping"
 
@@ -52,8 +54,9 @@ export function ProductTabs({ description, productId }: ProductTabsProps) {
         )}
 
         {activeTab === "reviews" && (
-          <div className="text-sm text-[#999999]">
-            <p>Reviews for product {productId} will appear here.</p>
+          <div>
+            <ReviewList productId={productId} />
+            <ReviewForm productId={productId} />
           </div>
         )}
 
