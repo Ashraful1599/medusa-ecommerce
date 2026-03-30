@@ -3,12 +3,11 @@ FROM node:20-alpine
 # Use /server as workdir (Medusa recommendation to avoid admin conflicts)
 WORKDIR /server
 
-# Copy yarn config and lockfile first for layer caching
-COPY .yarnrc.yml yarn.lock package.json ./
-COPY .yarn ./.yarn
+# Copy lockfile first for better layer caching
+COPY package.json package-lock.json ./
 
-# Install dependencies using yarn (faster than npm for large dependency trees)
-RUN corepack enable && yarn install --immutable
+# npm ci is faster than npm install (uses lockfile, skips resolution)
+RUN npm ci
 
 # Copy source
 COPY . .
@@ -18,7 +17,7 @@ ARG MEDUSA_BACKEND_URL=https://medusa-backend-production-ee25.up.railway.app
 ENV MEDUSA_BACKEND_URL=$MEDUSA_BACKEND_URL
 
 # Build Medusa (outputs to .medusa/server/)
-RUN yarn build
+RUN npm run build
 
 # Switch to the build output directory
 WORKDIR /server/.medusa/server
@@ -29,5 +28,5 @@ RUN npm install
 ENV NODE_ENV=production
 EXPOSE 9000
 
-# predeploy runs migrations, then start runs the server
+# Run migrations then start the server
 CMD ["sh", "-c", "node_modules/.bin/medusa db:migrate && node_modules/.bin/medusa start"]
