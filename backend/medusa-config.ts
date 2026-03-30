@@ -12,6 +12,9 @@ const cookieSecret = process.env.COOKIE_SECRET
 if (!cookieSecret) throw new Error("COOKIE_SECRET environment variable is required")
 
 module.exports = defineConfig({
+  admin: {
+    backendUrl: process.env.MEDUSA_BACKEND_URL,
+  },
   projectConfig: {
     databaseUrl,
     http: {
