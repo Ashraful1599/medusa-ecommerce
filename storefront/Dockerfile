@@ -4,7 +4,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-cache-storefront,target=/root/.npm \
     npm install --prefer-offline
 
 COPY . .

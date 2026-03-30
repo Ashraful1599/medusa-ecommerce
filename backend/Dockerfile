@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies with BuildKit cache mount (persists between Railway builds)
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
     npm install --prefer-offline
 
 # Copy source and build
