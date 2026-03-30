@@ -1,16 +1,19 @@
+# syntax=docker/dockerfile:1
 FROM node:20-alpine
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --prefer-offline
 
 COPY . .
 RUN npm run build
 
-EXPOSE 8000
-
+ENV NODE_ENV=production
 ENV PORT=8000
 ENV HOSTNAME="0.0.0.0"
+
+EXPOSE 8000
 
 CMD ["npm", "run", "start"]

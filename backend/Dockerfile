@@ -1,15 +1,20 @@
+# syntax=docker/dockerfile:1
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies first (cached layer)
+# Install dependencies with BuildKit cache mount (persists between Railway builds)
 COPY package.json package-lock.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --prefer-offline
 
 # Copy source and build
 COPY . .
 RUN npm run build
 
+ENV NODE_ENV=production
+ENV PATH="/app/node_modules/.bin:$PATH"
+
 EXPOSE 9000
 
-CMD ["npm", "run", "start"]
+CMD ["medusa", "start"]
