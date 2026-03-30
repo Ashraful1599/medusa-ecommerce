@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       { hostname: "images.unsplash.com" },
       { hostname: "*.unsplash.com" },
       { protocol: "http", hostname: "localhost", port: "9000" },
+      { protocol: "https", hostname: "*.up.railway.app" },
     ],
     // Skip optimization for localhost images in dev (Next.js blocks private IPs otherwise)
     unoptimized: process.env.NODE_ENV === "development",
