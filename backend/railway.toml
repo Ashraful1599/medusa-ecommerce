@@ -1,9 +1,10 @@
 [build]
-builder = "dockerfile"
+builder = "nixpacks"
+buildCommand = "npm ci && npm run build && cd .medusa/server && npm install --omit=dev"
 buildTimeout = 1800
 
 [deploy]
-startCommand = "medusa start"
+startCommand = "cd .medusa/server && npm run predeploy && npm run start"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
